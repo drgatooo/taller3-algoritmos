@@ -2,3 +2,4 @@ access.log
 *.zip
 data/ratings.csv
 data/access.log
+*.pdf
