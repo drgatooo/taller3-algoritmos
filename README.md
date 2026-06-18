@@ -8,118 +8,9 @@ Integrantes
 
 ### Videos Explicativos
 
-- Ejercicio 1: pendiente
 - Ejercicio 2: https://youtu.be/r3se1OOeAQ4
 - Ejercicio 3: https://youtu.be/ACihE3TRW40
 - Ejercicio 4: pendiente
-
----
-
-## Ejercicio 1 — Stock Span con Pila Monótona
-
-### Objetivo
-
-Implementar una pila genérica y calcular el **Stock Span** de una serie de precios de cierre bursátiles utilizando una pila monótona de índices.
-
-El *stock span* de un día indica cuántos días consecutivos hacia atrás (incluido el actual) el precio de cierre fue menor o igual al precio del día actual.
-
-### Dataset
-
-**Huge Stock Market Dataset** — Kaggle. Autor: Boris Marjanovic
-
-https://www.kaggle.com/datasets/borismarjanovic/price-volume-data-for-all-us-stocks-etfs
-
-Cada archivo (p. ej. `aapl.us.txt`) contiene columnas `Date, Open, High, Low, Close, Volume, OpenInt`. Se utiliza la columna `Close` de una acción a elección.
-
-Ubicación esperada: `data/<accion>.us.txt`
-
-### Estructura del Proyecto
-
-```
-taller3/
-│
-├── go.mod
-├── README.md
-│
-├── data/
-│   └── <accion>.us.txt   ← dataset bursátil (no incluido, descargar de Kaggle)
-│
-└── pilas/
-    ├── pila.go           ← Pila genérica + CalcularStockSpan + lector CSV
-    ├── pila_test.go      ← pruebas unitarias y benchmarks
-    │
-    └── cmd/
-        └── main.go       ← punto de entrada
-```
-
-### Implementación
-
-> **Pendiente** — sección en desarrollo.
-
-### Complejidad Temporal
-
-| Operación          | Complejidad |
-| ------------------ | ----------- |
-| `Push`             | O(1)        |
-| `Pop`              | O(1)        |
-| `Peek`             | O(1)        |
-| `IsEmpty`          | O(1)        |
-| `CalcularStockSpan`| O(n)        |
-
-**Justificación:** Cada índice se apila exactamente una vez y se desapila exactamente una vez, por lo que el costo total del algoritmo es O(n) pese a tener un bucle interno.
-
-### Ejecución
-
-```shell
-go run ./pilas/cmd <ruta_archivo> <N>
-```
-
-**Parámetros:**
-
-| Argumento       | Descripción                                      |
-| --------------- | ------------------------------------------------ |
-| `<ruta_archivo>`| Ruta al archivo `.txt` de la acción              |
-| `<N>`           | Número de primeros/últimos resultados a mostrar  |
-
-### Pruebas Unitarias
-
-**Ejecución:**
-
-```shell
-go test ./pilas -v
-```
-
-**Resultados:**
-
-> Pendiente.
-
-**Pruebas previstas:**
-
-| Test                     | Descripción                                            |
-| ------------------------ | ------------------------------------------------------ |
-| `TestPushPop`            | Verifica orden LIFO al extraer elementos               |
-| `TestPopVacia`           | Pop en pila vacía devuelve `false`                     |
-| `TestPeek`               | Peek no modifica el tamaño de la pila                  |
-| `TestStockSpanBasico`    | Span correcto sobre serie de precios conocida          |
-| `TestStockSpanCreciente` | Serie ordenada ascendentemente → todos los spans crecen|
-| `TestStockSpanDecreciente`| Serie ordenada descendentemente → todos los spans = 1 |
-| `TestLeerPrecios`        | Carga y parseo correcto del archivo CSV                |
-
-### Benchmarks
-
-**Ejecución:**
-
-```shell
-go test ./pilas -bench=Benchmark -benchmem
-```
-
-**Resultados:**
-
-> Pendiente.
-
-### Conclusiones
-
-> Pendiente.
 
 ---
 
@@ -553,7 +444,7 @@ Los benchmarks `BenchmarkLRUPut` y `BenchmarkLRUGet` miden respectivamente la ve
 
 ### Objetivo
 
-Implementar un árbol **AVL** (árbol binario de búsqueda autobalanceado) que garantice altura O(log n) e indexe películas de MovieLens por clave numérica, permitiendo consultas por rango `[a, b]` eficientes.
+Implementar un árbol **AVL** (árbol binario de búsqueda autobalanceado) que garantice altura $O(\log n)$ e indexe películas de MovieLens por clave numérica, permitiendo consultas por rango `[a, b]` eficientes.
 
 ### Dataset
 
@@ -567,7 +458,7 @@ Ubicación esperada: `data/movies.csv` y `data/ratings.csv`
 
 ### Estructura del Proyecto
 
-```
+```text
 taller3/
 │
 ├── go.mod
@@ -587,70 +478,117 @@ taller3/
 
 ### Implementación
 
-> **Pendiente** — sección en desarrollo.
+El Índice AVL ha sido diseñado para maximizar el rendimiento al tratar con colisiones (películas con el mismo rating o del mismo año) y para optimizar las consultas masivas mediante poda geométrica de subárboles.
+
+#### Estructura del Nodo y Manejo de Colisiones
+En un dataset real como MovieLens, muchas películas comparten exactamente la misma calificación promedio (ej. 4.0). En lugar de insertar estos duplicados como nodos hijos (lo que aumentaría la profundidad del árbol innecesariamente), se implementó un `NodoAVL` que agrupa las colisiones en un *slice* continuo en memoria `Datos []Pelicula`.
+
+```go
+type Pelicula struct {
+	MovieID int
+	Title   string
+	Rating  float64
+}
+
+type NodoAVL struct {
+	Clave float64
+	Datos []Pelicula // Agrupación de registros con la misma clave O(1)
+	Alt   int
+	Izq   *NodoAVL
+	Der   *NodoAVL
+}
+```
+
+#### Inserción y Autobalanceo O(log n)
+
+La función `Insertar` agrega el nuevo registro siguiendo las reglas de un Árbol Binario de Búsqueda. En el retorno de la recursión, actualiza las alturas y evalúa el **factor de balance**. Si el subárbol se desequilibra ($|FB| > 1$), aplica las rotaciones necesarias (LL, RR, LR, RL) reasignando los punteros en tiempo constante.
+
+```go
+func Insertar(raiz *NodoAVL, clave float64, dato Pelicula, arbol *ArbolAVL) *NodoAVL
+```
+
+#### Consultas por Rango con Poda O(log n + k)
+
+Para garantizar una alta eficiencia, la función `ConsultaRango` implementa un algoritmo de **descarte inteligente**. En lugar de recorrer todo el árbol, compara la clave del nodo actual con los límites `[a, b]` para decidir si es matemáticamente posible encontrar resultados en sus subárboles, podando ramas enteras de forma anticipada.
+
+```go
+func ConsultaRango(raiz *NodoAVL, a, b float64) []Pelicula
+```
 
 ### Complejidad Temporal
 
-| Operación        | Complejidad       |
-| ---------------- | ----------------- |
-| `Insertar`       | O(log n)          |
-| `ConsultaRango`  | O(log n + k)      |
-| Rotaciones (×4)  | O(1) c/u          |
+| Operación       | Complejidad     |
+| --------------- | --------------- |
+| `Insertar`      | $O(\log n)$     |
+| `ConsultaRango` | $O(\log n + k)$ |
+| Rotaciones (×4) | $O(1)$ c/u      |
 
-**Justificación:** El balanceo automático (factor |FB| ≤ 1 en cada nodo) garantiza que la altura del árbol sea O(log n) incluso si los datos se insertan en orden. La consulta por rango poda subárboles completos fuera del intervalo `[a, b]`, logrando O(log n + k) donde k es el número de resultados.
+**Justificación:** El balanceo automático (factor $|FB| \le 1$ en cada nodo) garantiza que la altura del árbol sea estrictamente $O(\log n)$ incluso si los datos se insertan en orden creciente o decreciente. La consulta por rango poda subárboles completos fuera del intervalo `[a, b]`, logrando la meta $O(\log n + k)$ donde $k$ es el número total de películas retornadas.
 
 ### Ejecución
 
 ```shell
-go run ./arboles/cmd <ruta_movies> <ruta_ratings> <a> <b>
+go run ./arboles/cmd/main.go <ruta_ratings> <ruta_movies>
 ```
 
 **Parámetros:**
 
-| Argumento        | Descripción                                    |
-| ---------------- | ---------------------------------------------- |
-| `<ruta_movies>`  | Ruta a `movies.csv`                            |
-| `<ruta_ratings>` | Ruta a `ratings.csv`                           |
-| `<a>`            | Límite inferior del rango de consulta          |
-| `<b>`            | Límite superior del rango de consulta          |
+| Argumento | Descripción |
+| --- | --- |
+| `<ruta_ratings>` | Ruta a `ratings.csv` |
+| `<ruta_movies>` | Ruta a `movies.csv` |
 
 ### Pruebas Unitarias
 
 **Ejecución:**
 
 ```shell
-go test ./arboles -v
+go test ./arboles -v -cover
 ```
 
 **Resultados:**
 
-> Pendiente.
+```text
+=== RUN   TestAltura
+--- PASS: TestAltura (0.00s)
+=== RUN   TestObtenerBalance
+--- PASS: TestObtenerBalance (0.00s)
+=== RUN   TestRotacionesAVL
+--- PASS: TestRotacionesAVL (0.00s)
+=== RUN   TestInsertarDuplicados
+--- PASS: TestInsertarDuplicados (0.00s)
+=== RUN   TestConsultaRango
+--- PASS: TestConsultaRango (0.00s)
+PASS
+coverage: 100.0% of statements
+ok      taller3/arboles 0.002s  coverage: 100.0% of statements
+```
 
-**Pruebas previstas:**
-
-| Test                        | Descripción                                              |
-| --------------------------- | -------------------------------------------------------- |
-| `TestInsercionSimple`       | Inserción de nodos y verificación del BST               |
-| `TestBalanceoLL`            | Rotación LL restaura el balance                          |
-| `TestBalanceoRR`            | Rotación RR restaura el balance                          |
-| `TestBalanceoLR`            | Rotación LR restaura el balance                          |
-| `TestBalanceoRL`            | Rotación RL restaura el balance                          |
-| `TestDatosOrdenados`        | Árbol permanece balanceado con inserciones ordenadas     |
-| `TestConsultaRango`         | Devuelve exactamente los nodos dentro del rango `[a, b]` |
-| `TestConsultaRangoVacio`    | Rango sin resultados devuelve lista vacía                |
+Las pruebas validan que todas las rotaciones funcionen independientemente, aseguran que las agrupaciones en *slices* operen sin sobrescribir datos y comprueban que la lógica de poda del intervalo extraiga los datos exactos.
 
 ### Benchmarks
 
 **Ejecución:**
 
 ```shell
-go test ./arboles -bench=Benchmark -benchmem
+go test ./arboles -bench=. -benchmem
 ```
 
 **Resultados:**
 
-> Pendiente.
+```text
+goos: linux
+goarch: amd64
+pkg: taller3/arboles
+cpu: AMD Ryzen 7 5700G with Radeon Graphics         
+BenchmarkInsertar-16             6999496               194.0 ns/op            96 B/op          2 allocs/op
+BenchmarkConsultaRango-16          19891               65664 ns/op        548866 B/op          8 allocs/op
+PASS
+ok      taller3/arboles 3.473s
+```
 
 ### Conclusiones
 
-> Pendiente.
+- A diferencia de un *Binary Search Tree* (BST) estándar que degradaría su eficiencia a $O(n)$ si recibe datos ya ordenados o secuenciales, el árbol implementado activa sus mecanismos de rebalanceo constantes para mantener la forma plana e indexada.
+- La decisión de crear arreglos anidados dentro del nodo fue clave. En bases de datos reales como MovieLens, muchos registros comparten exactamente la misma calificación (ej. 4.0 o 5.0). Agruparlos redujo enormemente la profundidad estructural total del árbol.
+- La poda implementada en `ConsultaRango` evita iterar todo el dataset (como pasaría en una consulta tradicional de array), permitiendo descartar miles de nodos en memoria en microsegundos y cumpliendo exitosamente el requisito de $O(\log n + k)$.
